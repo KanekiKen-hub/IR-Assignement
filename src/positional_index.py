@@ -24,6 +24,15 @@ class PositionalIndex:
         return len(self._postings)
 
     @property
+    def total_term_occurrences(self) -> int:
+        """Return the total number of indexed token occurrences."""
+        return sum(
+            len(positions)
+            for postings in self._postings.values()
+            for positions in postings.values()
+        )
+
+    @property
     def preprocessor(self) -> Preprocessor:
         """Return the preprocessor used to build the index."""
         return self._preprocessor
@@ -38,13 +47,17 @@ class PositionalIndex:
         self._document_ids.clear()
 
         for document in documents:
-            document_id = document["document_id"]
-            tokens = self._preprocessor.process(document["text"])
-            self._document_ids.add(document_id)
-            for position, term in enumerate(tokens):
-                self._postings.setdefault(term, {}).setdefault(document_id, []).append(
-                    position
-                )
+            self.add_document(document)
+
+    def add_document(self, document: Mapping[str, str]) -> None:
+        """Add one document to the current index."""
+        document_id = document["document_id"]
+        tokens = self._preprocessor.process(document["text"])
+        self._document_ids.add(document_id)
+        for position, term in enumerate(tokens):
+            self._postings.setdefault(term, {}).setdefault(document_id, []).append(
+                position
+            )
 
     def get_postings(self, term: str) -> dict[str, list[int]]:
         """Return a copy of all document positions for a normalized term."""

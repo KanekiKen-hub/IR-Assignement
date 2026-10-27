@@ -109,3 +109,46 @@ example:
 ```powershell
 python -c "from src.inverted_index import InvertedIndex; from src.positional_index import PositionalIndex; from src.search_engine import SearchEngine; docs = [{'document_id': 'example-1', 'text': 'oil prices rose'}]; inverted = InvertedIndex(); positional = PositionalIndex(); inverted.build(docs); positional.build(docs); engine = SearchEngine(inverted, positional); print(engine.search('oil AND prices')); print(engine.phrase_positions('oil prices'))"
 ```
+
+## Phase 6: Evaluation
+
+`src/evaluation.py` measures Reuters document count, unique terms, total token
+occurrences, combined index construction time, approximate Python object
+storage, and execution time/result count for representative term, Boolean, and
+phrase queries. The evaluator feeds each lazily loaded article to both indexes
+in one pass. Its storage measurement walks the in-memory Python objects and is
+an approximation; it is not serialized size or peak process memory.
+
+The evaluator includes consistency checks for term retrieval, Boolean
+intersection/union, exact and repeated-term phrases, unknown terms, and empty
+queries. These checks are not relevance judgments. Reuters category metadata is
+available, but this project does not treat categories as query-level relevance
+labels; precision and recall are therefore not reported.
+
+Run the evaluation against the complete Reuters corpus:
+
+```powershell
+python -c "from src.evaluation import evaluate_corpus; report = evaluate_corpus(); print(report)"
+```
+
+Full-corpus measurements from a local run (Windows, Python 3.13.14):
+
+| Metric | Measurement |
+|---|---:|
+| Documents processed | 10,788 |
+| Unique terms | 30,953 |
+| Term occurrences | 1,476,858 |
+| Combined index construction time | 21.939 seconds |
+| Approximate in-memory index storage | 168,613,671 bytes (160.80 MiB) |
+
+| Query | Execution time | Results |
+|---|---:|---:|
+| `oil` | 0.000073 seconds | 1,038 |
+| `oil AND prices` | 0.000292 seconds | 389 |
+| `oil OR prices` | 0.000130 seconds | 1,656 |
+| `"oil prices"` | 0.002926 seconds | 212 |
+
+These are measurements from one run, not performance guarantees. Query times
+vary with machine load and environment. Approximate storage includes the Python
+objects reachable from the two indexes and should not be interpreted as peak
+process memory.

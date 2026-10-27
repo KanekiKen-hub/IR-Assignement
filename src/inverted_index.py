@@ -32,11 +32,15 @@ class InvertedIndex:
         self._document_ids.clear()
 
         for document in documents:
-            document_id = document["document_id"]
-            tokens = self._preprocessor.process(document["text"])
-            self._document_ids.add(document_id)
-            for term in set(tokens):
-                self._postings.setdefault(term, set()).add(document_id)
+            self.add_document(document)
+
+    def add_document(self, document: Mapping[str, str]) -> None:
+        """Add one document to the current index."""
+        document_id = document["document_id"]
+        tokens = self._preprocessor.process(document["text"])
+        self._document_ids.add(document_id)
+        for term in set(tokens):
+            self._postings.setdefault(term, set()).add(document_id)
 
     def get_postings(self, term: str) -> set[str]:
         """Return document IDs containing a term, or an empty set if it is unknown."""
