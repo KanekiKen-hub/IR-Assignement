@@ -71,3 +71,19 @@ To build an index over the actual Reuters corpus and inspect example postings:
 ```powershell
 python -c "from src.dataset_loader import DatasetLoader; from src.inverted_index import InvertedIndex; index = InvertedIndex(); index.build(DatasetLoader().iter_documents()); print('Documents:', index.document_count); print('Unique terms:', index.unique_term_count); print('oil document frequency:', index.get_document_frequency('oil')); print('oil sample postings:', sorted(index.get_postings('oil'))[:10])"
 ```
+
+## Phase 4: Positional Index
+
+`PositionalIndex.build(documents)` uses the same preprocessing pipeline and
+stores every term occurrence by document ID. Positions are zero-based indexes
+into the processed token sequence, so optional stop-word removal changes the
+sequence being indexed consistently. `get_postings(term)` returns a copy of
+the term's document-to-positions mapping; `get_positions(term, document_id)`
+and `get_term_frequency(term, document_id)` provide document-level lookups.
+
+Run the unit tests with `python -m pytest -q`. To inspect positions from a few
+actual Reuters documents:
+
+```powershell
+python -c "from itertools import islice; from src.dataset_loader import DatasetLoader; from src.positional_index import PositionalIndex; index = PositionalIndex(); index.build(islice(DatasetLoader().iter_documents(), 3)); print('Documents:', index.document_count); print('oil postings:', index.get_postings('oil'))"
+```
