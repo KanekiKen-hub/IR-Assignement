@@ -52,3 +52,22 @@ To check a few actual Reuters documents after completing Phase 1:
 ```powershell
 python -c "from itertools import islice; from src.dataset_loader import DatasetLoader; from src.preprocessor import Preprocessor; loader = DatasetLoader(); processor = Preprocessor(); print('Documents:', loader.document_count); [print(doc['document_id'], processor.process(doc['text'])[:12]) for doc in islice(loader.iter_documents(), 3)]"
 ```
+
+## Phase 3: Inverted Index
+
+`InvertedIndex.build(documents)` consumes the loader's document iterator and
+uses the same `Preprocessor` to normalize article text. It maps each token to
+the set of original Reuters file IDs containing it. Repeated occurrences in one
+article do not duplicate that document ID. `get_postings(term)` returns a copy
+of the matching ID set, while `get_document_frequency(term)` returns its size.
+Unknown terms (and inputs that do not preprocess to exactly one token) return
+empty postings and frequency zero.
+
+The index is in memory; the loader still yields article text incrementally.
+Run its unit tests with `python -m pytest -q`.
+
+To build an index over the actual Reuters corpus and inspect example postings:
+
+```powershell
+python -c "from src.dataset_loader import DatasetLoader; from src.inverted_index import InvertedIndex; index = InvertedIndex(); index.build(DatasetLoader().iter_documents()); print('Documents:', index.document_count); print('Unique terms:', index.unique_term_count); print('oil document frequency:', index.get_document_frequency('oil')); print('oil sample postings:', sorted(index.get_postings('oil'))[:10])"
+```
