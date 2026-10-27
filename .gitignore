@@ -1,0 +1,15 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Downloaded corpora and generated indexes
+nltk_data/
+data/
+index/
+indexes/
+
+# Temporary files and local editor settings
+*.tmp
+.vscode/
