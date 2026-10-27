@@ -23,6 +23,11 @@ class PositionalIndex:
         """Return the number of distinct terms in the index."""
         return len(self._postings)
 
+    @property
+    def preprocessor(self) -> Preprocessor:
+        """Return the preprocessor used to build the index."""
+        return self._preprocessor
+
     def build(self, documents: Iterable[Mapping[str, str]]) -> None:
         """Build from documents with ``document_id`` and raw ``text`` fields.
 

@@ -87,3 +87,25 @@ actual Reuters documents:
 ```powershell
 python -c "from itertools import islice; from src.dataset_loader import DatasetLoader; from src.positional_index import PositionalIndex; index = PositionalIndex(); index.build(islice(DatasetLoader().iter_documents(), 3)); print('Documents:', index.document_count); print('oil postings:', index.get_postings('oil'))"
 ```
+
+## Phase 5: Search
+
+`SearchEngine` uses the inverted index for term lookup and Boolean AND/OR
+intersection/union, and the positional index for exact phrase search. A phrase
+must match consecutive processed-token positions; `phrase_positions()` returns
+the zero-based start positions for each matching document. It handles unknown
+terms and empty queries with empty results. Malformed non-empty syntax raises a
+`ValueError` with a query explanation.
+
+Supported queries are a single term (`oil`), two terms joined by one Boolean
+operator (`oil AND prices`, `oil OR prices`), or a quoted phrase (`"oil prices"`).
+Unquoted multiple terms, mixed/repeated operators, and malformed quotes are
+rejected rather than interpreted ambiguously. Pass the same `Preprocessor`
+instance to both indexes so query normalization matches indexing.
+
+Run the search tests with `python -m pytest -q`. For a small deterministic
+example:
+
+```powershell
+python -c "from src.inverted_index import InvertedIndex; from src.positional_index import PositionalIndex; from src.search_engine import SearchEngine; docs = [{'document_id': 'example-1', 'text': 'oil prices rose'}]; inverted = InvertedIndex(); positional = PositionalIndex(); inverted.build(docs); positional.build(docs); engine = SearchEngine(inverted, positional); print(engine.search('oil AND prices')); print(engine.phrase_positions('oil prices'))"
+```
