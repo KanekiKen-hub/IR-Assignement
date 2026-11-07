@@ -1,12 +1,16 @@
 # Telugu Wikipedia Positional Inverted Index
 
-An Information Retrieval assignment project that streams Telugu Wikipedia
-articles, cleans their Wikitext, tokenizes Telugu Unicode text, and builds a
-positional inverted index with collection frequency (CF) and document frequency
-(DF). Vocabulary metadata is held in memory when the index is opened; complete
-positional postings are stored on disk and fetched by byte offset.
+This Information Retrieval project builds a disk-based positional inverted
+index for Telugu Wikipedia articles. It streams and cleans compressed
+Wikipedia Wikitext, tokenizes Telugu text, and uses bounded external sorting
+to construct postings without holding the complete postings list in memory.
+The verified local index covers the first **10,000 valid articles**, containing
+**4,916,974 token occurrences** and **303,366 vocabulary terms**. Each term has
+collection frequency (CF) and document frequency (DF) statistics. Vocabulary
+metadata is loaded into memory when the index is opened; positional postings
+are stored on disk and retrieved by byte offset.
 
-The repository also retains a separate, legacy in-memory Reuters search
+The repository also contains a separate legacy in-memory Reuters search
 demonstration. It is not part of the Telugu Wikipedia indexing pipeline.
 
 ## Dataset and indexed subset
@@ -24,10 +28,24 @@ the dump. The dump and generated index files are excluded from Git by
 `.gitignore`.
 
 The verified local index contains the first **10,000 valid articles** from the
-dump. This is a subset, not the complete Telugu Wikipedia corpus. The actual
-build encountered 12,911 XML pages while finding those 10,000 valid articles:
-2,218 non-main-namespace pages and 693 redirects were skipped; no empty
-articles were encountered before the limit was reached.
+dump. It is not an index of the entire eligible dataset of **130,248 articles**.
+The actual build encountered 12,911 XML pages while finding those 10,000 valid
+articles: 2,218 non-main-namespace pages and 693 redirects were skipped; no
+empty articles were encountered before the limit was reached.
+
+The official Wikimedia dump index is
+<https://dumps.wikimedia.org/tewiki/latest/>. Download the
+`tewiki-latest-pages-articles.xml.bz2` pages-articles file from that index and
+place it in the repository root. If it is already present, verify its location
+in PowerShell with:
+
+```powershell
+Get-Item .\tewiki-latest-pages-articles.xml.bz2
+```
+
+No separate dataset or generated-index download URL is provided by this
+project. The index can be regenerated locally from the dump using the build
+command below.
 
 ## Technologies
 
@@ -58,32 +76,70 @@ corpus to be available.
 ├── main.py
 ├── requirements.txt
 ├── scripts/
-│   └── download_dataset.py       # Legacy Reuters corpus helper
+│   └── download_dataset.py       # Legacy Reuters corpus download/check helper
 ├── src/
-│   ├── dataset_loader.py         # Legacy Reuters loader
-│   ├── disk_index_builder.py     # External-sort disk index builder
-│   ├── evaluation.py             # Legacy in-memory evaluation helpers
-│   ├── index_builder.py          # In-memory positional-index helper
-│   ├── inverted_index.py         # Legacy in-memory term-to-document index
-│   ├── positional_index.py       # In-memory positional reference index
-│   ├── preprocessor.py           # Unicode NFC normalization and tokenization
-│   ├── search_engine.py          # Legacy in-memory Reuters query engine
-│   ├── storage_manager.py        # Disk postings access and index validation
+│   ├── __init__.py
+│   ├── dataset_loader.py
+│   ├── disk_index_builder.py
+│   ├── evaluation.py
+│   ├── index_builder.py
+│   ├── inverted_index.py
+│   ├── positional_index.py
+│   ├── preprocessor.py
+│   ├── search_engine.py
+│   ├── storage_manager.py
 │   ├── wikipedia_dataset_loader.py
 │   └── wikitext_cleaner.py
 └── tests/
+    ├── test_dataset_loader.py
     ├── test_disk_index.py
+    ├── test_evaluation.py
+    ├── test_inverted_index.py
     ├── test_main.py
     ├── test_positional_index.py
     ├── test_preprocessor.py
+    ├── test_search_engine.py
     ├── test_wikipedia_dataset_loader.py
-    ├── test_wikitext_cleaner.py
-    └── ...                       # Remaining Reuters and shared tests
+    └── test_wikitext_cleaner.py
 ```
 
 The generated `storage/` directory is local, ignored output. Its current
 generation is selected by `storage/current.json`; each generation contains
 `vocabulary.json` and `postings.bin`.
+
+### Module responsibilities
+
+- `main.py`: command-line application for building or opening the Telugu
+  disk index and for the separate Reuters in-memory search demonstration. Its
+  Telugu prompt tokenizes a multi-word query and displays each term's
+  statistics and postings independently.
+- `src/__init__.py`: marks `src` as a Python package.
+- `src/wikipedia_dataset_loader.py`: incrementally reads the compressed
+  MediaWiki XML dump and yields eligible main-namespace pages with Wikipedia
+  page IDs.
+- `src/wikitext_cleaner.py`: parses Wikitext, removes or renders markup as
+  appropriate, and returns normalized readable text.
+- `src/preprocessor.py`: applies NFC normalization and lowercasing and
+  tokenizes Unicode text in source order.
+- `src/positional_index.py`: in-memory reference positional index that tracks
+  term positions, CF, and DF.
+- `src/index_builder.py`: builds the in-memory positional reference index
+  from document IDs and already-tokenized documents.
+- `src/disk_index_builder.py`: builds the large disk-backed positional
+  index using bounded buffers, sorted runs, and external merging.
+- `src/storage_manager.py`: loads vocabulary metadata, validates the
+  generation and postings ranges, and retrieves individual checksummed
+  postings records from disk.
+- `src/dataset_loader.py`: lazily loads Reuters corpus documents.
+- `src/inverted_index.py`: in-memory term-to-document index used by Reuters.
+- `src/search_engine.py`: single-term, Boolean, and phrase retrieval for the
+  Reuters in-memory indexes; it does not power Telugu disk-index query
+  evaluation.
+- `src/evaluation.py`: Reuters in-memory index measurements and correctness
+  checks.
+- `scripts/download_dataset.py`: downloads/checks the NLTK Reuters corpus; it
+  does not download the Telugu Wikipedia dump.
+- `tests/`: automated tests for the modules and CLI workflows.
 
 ## Processing and storage architecture
 
@@ -197,9 +253,23 @@ To re-run full record verification when opening:
 python -X utf8 main.py --load-existing --storage .\storage --verify
 ```
 
-At the prompt, enter one term, for example `తెలుగు`, to display its CF, DF,
-and postings; enter `q` to exit. The CLI prints all postings for a found term,
-which can produce extensive output for common terms.
+At the prompt, enter one Telugu term, for example `తెలుగు`, to display its
+CF, DF, and complete postings; enter `q` to exit. The CLI also accepts
+multiple whitespace- or punctuation-separated terms. It tokenizes the input
+with the existing preprocessor, then retrieves and displays each term's CF,
+DF, and postings independently. Repeated terms are displayed repeatedly.
+Unknown terms are reported individually. The postings lists are never
+combined.
+
+For example, enter:
+
+```text
+భారతదేశం అంకగణితం చరిత్ర సంస్కృతి
+```
+
+The Telugu CLI does **not** evaluate this as a phrase, AND, or OR query; it
+only performs separate term lookups. Phrase and Boolean search are available
+only in the separate legacy Reuters in-memory search workflow.
 
 The index can also be inspected from Python while limiting displayed examples:
 
@@ -264,28 +334,97 @@ posting lists shown here are abbreviated, while the CLI prints the full list.
 | ఆంధ్రప్రదేశ్ | Yes | 1,714 | 1,008 | `10028:[135]`, `10039:[219]`, `10046:[39]` |
 | కంప్యూటర్ | Yes | 131 | 64 | `10306:[71]`, `1150:[291,339]`, `1212:[68,127,151,169,197,246,304,367]` |
 
+### Multi-term terminal example
+
+The following actual query is processed as four independent term lookups.
+Postings shown are excerpts from the complete lists printed by the CLI:
+
+```text
+Query: భారతదేశం అంకగణితం చరిత్ర సంస్కృతి
+
+Term: భారతదేశం
+CF: 447
+DF: 222
+Postings:
+10267: [281]
+10277: [34]
+10278: [17, 351]
+... (219 additional document postings)
+
+Term: అంకగణితం
+CF: 1
+DF: 1
+Postings:
+2495: [203]
+
+Term: చరిత్ర
+CF: 1430
+DF: 804
+Postings:
+10099: [621]
+10121: [54]
+10206: [136]
+... (801 additional document postings)
+
+Term: సంస్కృతి
+CF: 278
+DF: 149
+Postings:
+10195: [35]
+10277: [78, 3138]
+10300: [1225]
+... (146 additional document postings)
+```
+
+The ellipses above abbreviate the documentation excerpt only. During the
+actual terminal run, the CLI printed each term's complete postings list.
+
+## Assignment output
+
+The root `output.txt` contains five multi-word Telugu test queries, with two
+selected rare terms from each query (ten unique terms total). It lists CF and
+DF for every selected term, each term's complete positional postings as a
+separate list, and checks that the postings' document-entry count equals DF
+and their total position count equals CF. The query strings provide context;
+the Telugu CLI retrieves the selected terms independently and does not claim
+phrase or AND-query matching.
+
 ## Tests
 
 Run the complete test suite from the repository root:
 
 ```powershell
-python -m pytest -q
+python -m pytest -q tests --import-mode=importlib
 ```
 
-The verified result for this project state is **95 passed**. Tests cover
-preprocessing, Wikitext cleaning, XML loading, in-memory indexing, disk
+The verified result for the current project state is **96 passed**. Tests
+cover preprocessing, Wikitext cleaning, XML loading, in-memory indexing, disk
 serialization and retrieval, checksums, generation publication, and CLI
-behavior.
+behavior, including multi-term Telugu lookups.
 
 ## Limitations
 
 - The delivered disk index covers 10,000 valid articles only; it is not an
-  index of the entire Telugu Wikipedia corpus.
-- The interactive index CLI supports single-term CF/DF and postings
-  inspection. The legacy Reuters CLI's Boolean and phrase-search capabilities
-  use separate in-memory Reuters indexes; they do not operate on the Telugu
+  index of the entire eligible 130,248-article dataset or full Telugu
+  Wikipedia corpus.
+- Multi-word input to the Telugu disk-index CLI is split into separate terms.
+  Each term's CF, DF, and positional postings are displayed independently;
+  Telugu phrase, AND, and OR matching are not implemented.
+- The legacy Reuters CLI's Boolean and phrase-search capabilities use
+  separate in-memory Reuters indexes; they do not operate on the Telugu
   disk index.
 - The configured sort-buffer limit is in records rather than bytes, and
   vocabulary metadata is held in memory by design.
-  - Generated index files and the compressed dataset are local artifacts and
-    are not committed to Git.
+- Generated index files and the compressed dataset are local artifacts and
+  are not committed to Git.
+
+## GitHub repository
+
+Project source code and documentation:
+<https://github.com/KanekiKen-hub/IR-Assignement>
+
+The dataset can be obtained from the official
+[Telugu Wikipedia Wikimedia dump index](https://dumps.wikimedia.org/tewiki/latest/).
+This repository does not provide a separate generated-index download link;
+build the index locally from the compressed dump using the command in
+**Build, reopen, and search**.

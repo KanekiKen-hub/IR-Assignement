@@ -205,25 +205,28 @@ def run_wikipedia_index_cli(
         output_fn(f"Verification: {index.verify()}")
 
     while True:
-        term = read_input("\nEnter a Telugu term (or q to quit): ").strip()
-        if term.lower() in {"q", "quit", "exit"}:
+        query = read_input("\nEnter Telugu term(s) (or q to quit): ").strip()
+        if query.lower() in {"q", "quit", "exit"}:
             output_fn("Goodbye.")
             return index
-        if not term:
+        terms = preprocessor.process(query)
+        if not terms:
             output_fn("Please enter a non-empty term.")
             continue
 
-        statistics = index.get_term_statistics(term)
-        if statistics is None:
-            output_fn(f"Unknown term: {term}")
-            continue
+        output_fn(f"Query: {query}")
+        for term in terms:
+            output_fn(f"Term: {term}")
+            statistics = index.get_term_statistics(term)
+            if statistics is None:
+                output_fn(f"Unknown term: {term}")
+                continue
 
-        output_fn(f"Term: {term}")
-        output_fn(f"DF: {statistics['df']}")
-        output_fn(f"CF: {statistics['cf']}")
-        output_fn("Postings:")
-        for document_id, positions in index.get_postings(term).items():
-            output_fn(f"{document_id}: {positions}")
+            output_fn(f"CF: {statistics['cf']}")
+            output_fn(f"DF: {statistics['df']}")
+            output_fn("Postings:")
+            for document_id, positions in index.get_postings(term).items():
+                output_fn(f"{document_id}: {positions}")
 
 
 def main(argv: list[str] | None = None) -> None:

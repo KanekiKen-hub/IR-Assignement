@@ -165,3 +165,143 @@ def test_cli_loads_existing_disk_index_without_dataset_dump(
     assert "DF: 1" in output
     assert "CF: 2" in output
     assert "786: [0, 2]" in output
+
+
+def test_wikipedia_cli_reports_each_query_term_independently(tmp_path):
+    storage_dir = tmp_path / "index"
+    build_disk_index(
+        [
+            ("786", ["తెలుగు", "భాష", "తెలుగు", "చరిత్ర", "సంస్కృతి", "వాక్యం"]),
+            ("787", ["భాష", "చరిత్ర"]),
+        ],
+        storage_dir,
+    )
+    queries = iter(
+        [
+            "తెలుగు",
+            "తెలుగు భాష",
+            "తెలుగు భాష చరిత్ర సంస్కృతి వాక్యం",
+            "తెలుగు లేనిపదం",
+            "లేనిపదం",
+            "తెలుగు తెలుగు",
+            "తెలుగు, భాష!",
+            "q",
+        ]
+    )
+    outputs = []
+
+    run_wikipedia_index_cli(
+        dump_path=tmp_path / "not-downloaded.xml.bz2",
+        storage_dir=storage_dir,
+        build_index=False,
+        input_fn=lambda _prompt: next(queries),
+        output_fn=outputs.append,
+    )
+
+    query_blocks = {}
+    current_query = None
+    for line in outputs:
+        if line.startswith("Query: "):
+            current_query = line
+            query_blocks[current_query] = []
+        elif current_query is not None and line != "Goodbye.":
+            query_blocks[current_query].append(line)
+
+    assert "Query: తెలుగు" in outputs
+    assert query_blocks["Query: తెలుగు"] == [
+        "Term: తెలుగు",
+        "CF: 2",
+        "DF: 1",
+        "Postings:",
+        "786: [0, 2]",
+    ]
+
+    assert "Query: తెలుగు భాష" in outputs
+    assert query_blocks["Query: తెలుగు భాష"] == [
+        "Term: తెలుగు",
+        "CF: 2",
+        "DF: 1",
+        "Postings:",
+        "786: [0, 2]",
+        "Term: భాష",
+        "CF: 2",
+        "DF: 2",
+        "Postings:",
+        "786: [1]",
+        "787: [0]",
+    ]
+
+    five_term_query = "Query: తెలుగు భాష చరిత్ర సంస్కృతి వాక్యం"
+    assert five_term_query in outputs
+    assert query_blocks[five_term_query] == [
+        "Term: తెలుగు",
+        "CF: 2",
+        "DF: 1",
+        "Postings:",
+        "786: [0, 2]",
+        "Term: భాష",
+        "CF: 2",
+        "DF: 2",
+        "Postings:",
+        "786: [1]",
+        "787: [0]",
+        "Term: చరిత్ర",
+        "CF: 2",
+        "DF: 2",
+        "Postings:",
+        "786: [3]",
+        "787: [1]",
+        "Term: సంస్కృతి",
+        "CF: 1",
+        "DF: 1",
+        "Postings:",
+        "786: [4]",
+        "Term: వాక్యం",
+        "CF: 1",
+        "DF: 1",
+        "Postings:",
+        "786: [5]",
+    ]
+
+    assert "Query: తెలుగు లేనిపదం" in outputs
+    assert query_blocks["Query: తెలుగు లేనిపదం"] == [
+        "Term: తెలుగు",
+        "CF: 2",
+        "DF: 1",
+        "Postings:",
+        "786: [0, 2]",
+        "Term: లేనిపదం",
+        "Unknown term: లేనిపదం",
+    ]
+    assert "Query: లేనిపదం" in outputs
+    assert query_blocks["Query: లేనిపదం"] == [
+        "Term: లేనిపదం",
+        "Unknown term: లేనిపదం",
+    ]
+
+    assert query_blocks["Query: తెలుగు తెలుగు"] == [
+        "Term: తెలుగు",
+        "CF: 2",
+        "DF: 1",
+        "Postings:",
+        "786: [0, 2]",
+        "Term: తెలుగు",
+        "CF: 2",
+        "DF: 1",
+        "Postings:",
+        "786: [0, 2]",
+    ]
+    assert query_blocks["Query: తెలుగు, భాష!"] == [
+        "Term: తెలుగు",
+        "CF: 2",
+        "DF: 1",
+        "Postings:",
+        "786: [0, 2]",
+        "Term: భాష",
+        "CF: 2",
+        "DF: 2",
+        "Postings:",
+        "786: [1]",
+        "787: [0]",
+    ]
+    assert outputs[-1] == "Goodbye."

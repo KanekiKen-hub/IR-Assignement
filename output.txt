@@ -1,81 +1,110 @@
-TELUGU WIKIPEDIA POSITIONAL INDEX - RARE TERM EXAMPLES
+TELUGU WIKIPEDIA POSITIONAL INDEX - RARE-TERM TEST CASES
 Index generation: 04d4fae9a0bf45b59ba83d388ce30ecd
-Selected from the existing vocabulary; no index rebuild performed.
-All ten terms have the minimum observed DF of 1.
-Postings are complete; positions are zero-based token offsets.
+The queries are multi-word Telugu text samples. Each selected term below was
+retrieved independently. No phrase or AND-query matching is claimed.
+Positions are zero-based token offsets.
 
 TEST CASE 1
-Search term: అంకగణితం
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  2495: [203]
-Verification: 1 document entries = DF; 1 positions = CF.
 
-Search term: అంకము
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  1127: [362]
-Verification: 1 document entries = DF; 1 positions = CF.
+Search Query:
+వాహనదారులు శిరస్త్రాణం (హెల్మెట్‌) ధరించే విషయాన్ని ప్రజల ఇష్టాయిష్టాలకు వదిలిపెట్టకుండా ప్రభుత్వం చర్యలు తీసుకుంటోంది. అలాగే మద్య నిషధంలోనూ ఉండాలి.
+
+Selected Rare Term 1: వాహనదారులు
+CF: 1
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10028: [192]
+
+Selected Rare Term 2: హెల్మెట్
+CF: 1
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10028: [194]
+
+Verification:
+  వాహనదారులు: 1 document entries = DF 1 (PASS); 1 positions = CF 1 (PASS)
+  హెల్మెట్: 1 document entries = DF 1 (PASS); 1 positions = CF 1 (PASS)
 
 TEST CASE 2
-Search term: అంకితంగా
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  2505: [3015]
-Verification: 1 document entries = DF; 1 positions = CF.
 
-Search term: అంకితభావం
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  2495: [634]
-Verification: 1 document entries = DF; 1 positions = CF.
+Search Query:
+అధికార గర్వానికి ధనమదం తోడైతే పై వర్గం వారు ఎటువంటి దుర్మార్గాలు చేయగలరో ఆయన నిజం నాటకంలో వ్యక్తం చేసాడు.
+
+Selected Rare Term 1: ధనమదం
+CF: 1
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10085: [289]
+
+Selected Rare Term 2: దుర్మార్గాలు
+CF: 1
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10085: [295]
+
+Verification:
+  ధనమదం: 1 document entries = DF 1 (PASS); 1 positions = CF 1 (PASS)
+  దుర్మార్గాలు: 1 document entries = DF 1 (PASS); 1 positions = CF 1 (PASS)
 
 TEST CASE 3
-Search term: అంకుర
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  1127: [421]
-Verification: 1 document entries = DF; 1 positions = CF.
 
-Search term: అంకురారోపణం
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  1780: [860]
-Verification: 1 document entries = DF; 1 positions = CF.
+Search Query:
+పైకి క్రిందకు జారగల ఒక టెర్రకోట కోతి బొమ్మ కూడా దొరికినది, ఇది ఒక వాహన కదలికను సూచిస్తుంది.
+
+Selected Rare Term 1: జారగల
+CF: 1
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10267: [612]
+
+Selected Rare Term 2: కదలికను
+CF: 1
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10267: [622]
+
+Verification:
+  జారగల: 1 document entries = DF 1 (PASS); 1 positions = CF 1 (PASS)
+  కదలికను: 1 document entries = DF 1 (PASS); 1 positions = CF 1 (PASS)
 
 TEST CASE 4
-Search term: అంకుశము
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  11373: [181]
-Verification: 1 document entries = DF; 1 positions = CF.
 
-Search term: అంగద
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  10267: [1636]
-Verification: 1 document entries = DF; 1 positions = CF.
+Search Query:
+కాల్షియమ్ బై కార్బోనేట్, ఇతర ఖనిజాలు కలిగిఉన్న పైకప్పు నుంచి కారుతున్న నీటివల్లే నేలపై దిబ్బల వంటివి ఏర్పడతాయి.
+
+Selected Rare Term 1: కార్బోనేట్
+CF: 2
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10272: [42, 79]
+
+Selected Rare Term 2: నీటివల్లే
+CF: 1
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10272: [86]
+
+Verification:
+  కార్బోనేట్: 1 document entries = DF 1 (PASS); 2 positions = CF 2 (PASS)
+  నీటివల్లే: 1 document entries = DF 1 (PASS); 1 positions = CF 1 (PASS)
 
 TEST CASE 5
-Search term: అంగము
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  1187: [83]
-Verification: 1 document entries = DF; 1 positions = CF.
 
-Search term: అంగబలం
-Collection Frequency (CF): 1
-Document Frequency (DF): 1
-Positional postings (document_id: [token positions]):
-  12038: [26]
-Verification: 1 document entries = DF; 1 positions = CF.
+Search Query:
+2004 సునామి సందర్భంలో ఈ కాలువ సముద్రపు నీటికి అడ్డుకట్టై నిలిచి ఎందరో బెస్తవారిని, చాలా గ్రామాలను రక్షించింది.
 
+Selected Rare Term 1: అడ్డుకట్టై
+CF: 1
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10278: [205]
+
+Selected Rare Term 2: బెస్తవారిని
+CF: 1
+DF: 1
+Positional Postings (document_id: [token positions]):
+  10278: [208]
+
+Verification:
+  అడ్డుకట్టై: 1 document entries = DF 1 (PASS); 1 positions = CF 1 (PASS)
+  బెస్తవారిని: 1 document entries = DF 1 (PASS); 1 positions = CF 1 (PASS)
