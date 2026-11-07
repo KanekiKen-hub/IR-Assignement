@@ -1,0 +1,81 @@
+TELUGU WIKIPEDIA POSITIONAL INDEX - RARE TERM EXAMPLES
+Index generation: 04d4fae9a0bf45b59ba83d388ce30ecd
+Selected from the existing vocabulary; no index rebuild performed.
+All ten terms have the minimum observed DF of 1.
+Postings are complete; positions are zero-based token offsets.
+
+TEST CASE 1
+Search term: అంకగణితం
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  2495: [203]
+Verification: 1 document entries = DF; 1 positions = CF.
+
+Search term: అంకము
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  1127: [362]
+Verification: 1 document entries = DF; 1 positions = CF.
+
+TEST CASE 2
+Search term: అంకితంగా
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  2505: [3015]
+Verification: 1 document entries = DF; 1 positions = CF.
+
+Search term: అంకితభావం
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  2495: [634]
+Verification: 1 document entries = DF; 1 positions = CF.
+
+TEST CASE 3
+Search term: అంకుర
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  1127: [421]
+Verification: 1 document entries = DF; 1 positions = CF.
+
+Search term: అంకురారోపణం
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  1780: [860]
+Verification: 1 document entries = DF; 1 positions = CF.
+
+TEST CASE 4
+Search term: అంకుశము
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  11373: [181]
+Verification: 1 document entries = DF; 1 positions = CF.
+
+Search term: అంగద
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  10267: [1636]
+Verification: 1 document entries = DF; 1 positions = CF.
+
+TEST CASE 5
+Search term: అంగము
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  1187: [83]
+Verification: 1 document entries = DF; 1 positions = CF.
+
+Search term: అంగబలం
+Collection Frequency (CF): 1
+Document Frequency (DF): 1
+Positional postings (document_id: [token positions]):
+  12038: [26]
+Verification: 1 document entries = DF; 1 positions = CF.
+
