@@ -9,6 +9,8 @@ nltk_data/
 data/
 index/
 indexes/
+/storage/
+/tewiki-latest-pages-articles.xml.bz2
 
 # Temporary files and local editor settings
 *.tmp

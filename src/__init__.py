@@ -1,1 +1,1 @@
-"""Reuters information retrieval system."""
+"""Telugu Wikipedia information retrieval project."""

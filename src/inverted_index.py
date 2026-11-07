@@ -6,7 +6,7 @@ from src.preprocessor import Preprocessor
 
 
 class InvertedIndex:
-    """Map each normalized term to the set of Reuters document IDs containing it."""
+    """Map each normalized term to the set of document IDs containing it."""
 
     def __init__(self, preprocessor: Preprocessor | None = None) -> None:
         self._preprocessor = preprocessor or Preprocessor()

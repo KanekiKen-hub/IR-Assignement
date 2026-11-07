@@ -1,40 +1,50 @@
-"""Deterministic tokenization and optional text normalization."""
+"""Unicode-aware tokenization and Telugu text normalization."""
 
-import re
+import unicodedata
 from collections.abc import Iterable
 
 
-_TOKEN_PATTERN = re.compile(r"[^\W_]+", flags=re.UNICODE)
-
-
 class Preprocessor:
-    """Normalize text into an ordered sequence of tokens.
+    """Normalize text to NFC and return an ordered sequence of tokens.
 
-    Letters and digits are retained, including mixed alphanumeric tokens.
-    Punctuation and underscores are token separators. Stop words are retained
-    unless a stop-word collection is explicitly provided. Porter stemming is
-    also opt-in.
+    Unicode letters and numbers are retained, including mixed tokens.
+    Combining marks remain attached to their preceding token. Punctuation,
+    underscores, and whitespace are separators. Stop words are retained unless
+    a stop-word collection is explicitly provided.
     """
 
     def __init__(
         self,
         stop_words: Iterable[str] | None = None,
-        stemming: bool = False,
     ) -> None:
         self._stop_words = (
-            {word.lower() for word in stop_words} if stop_words is not None else set()
+            {
+                unicodedata.normalize("NFC", word).lower()
+                for word in stop_words
+            }
+            if stop_words is not None
+            else set()
         )
-        self._stemmer = None
-        if stemming:
-            from nltk.stem import PorterStemmer
-
-            self._stemmer = PorterStemmer()
 
     def process(self, text: str) -> list[str]:
-        """Return lowercase tokens in source order, applying configured options."""
-        tokens = _TOKEN_PATTERN.findall(text.lower())
+        """Return NFC-normalized lowercase tokens in source order."""
+        normalized_text = unicodedata.normalize("NFC", text).lower()
+        tokens: list[str] = []
+        token: list[str] = []
+
+        for character in normalized_text:
+            category = unicodedata.category(character)
+            if category[0] in {"L", "N"}:
+                token.append(character)
+            elif category[0] == "M" and token:
+                token.append(character)
+            elif token:
+                tokens.append("".join(token))
+                token.clear()
+
+        if token:
+            tokens.append("".join(token))
+
         if self._stop_words:
             tokens = [token for token in tokens if token not in self._stop_words]
-        if self._stemmer is not None:
-            tokens = [self._stemmer.stem(token) for token in tokens]
         return tokens

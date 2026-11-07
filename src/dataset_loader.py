@@ -37,4 +37,11 @@ class DatasetLoader:
     def iter_documents(self) -> Iterator[dict[str, str]]:
         """Yield each original Reuters file ID and its raw text, one at a time."""
         for fileid in self._corpus.fileids():
-            yield {"document_id": fileid, "text": self._corpus.raw(fileid)}
+            yield self.get_document(fileid)
+
+    def get_document(self, document_id: str) -> dict[str, str]:
+        """Retrieve one article by its original Reuters file ID."""
+        return {
+            "document_id": document_id,
+            "text": self._corpus.raw(document_id),
+        }

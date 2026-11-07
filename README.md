@@ -1,15 +1,44 @@
-# Reuters Information Retrieval System
+# Telugu Wikipedia Positional Inverted Index
 
-This project will build an information retrieval system using the Reuters corpus distributed by NLTK. Development is split into phases; the current implementation downloads and verifies the corpus, loads Reuters articles lazily, and preprocesses text into deterministic tokens. Indexing and search features will be added in later phases.
+An Information Retrieval assignment project that streams Telugu Wikipedia
+articles, cleans their Wikitext, tokenizes Telugu Unicode text, and builds a
+positional inverted index with collection frequency (CF) and document frequency
+(DF). Vocabulary metadata is held in memory when the index is opened; complete
+positional postings are stored on disk and fetched by byte offset.
 
-## Phase 1: Setup
+The repository also retains a separate, legacy in-memory Reuters search
+demonstration. It is not part of the Telugu Wikipedia indexing pipeline.
 
-### Requirements
+## Dataset and indexed subset
 
-- Python 3
-- An internet connection for the initial Reuters corpus download
+The Telugu pipeline uses the compressed pages-articles dump:
 
-From the project directory in PowerShell, create and activate a virtual environment, then install the project dependencies:
+```text
+tewiki-latest-pages-articles.xml.bz2
+```
+
+The loader streams the bzip2-compressed MediaWiki XML directly. It yields
+non-empty, non-redirect pages in the main namespace, retaining the Wikipedia
+page ID as the document ID. It does not extract a second uncompressed copy of
+the dump. The dump and generated index files are excluded from Git by
+`.gitignore`.
+
+The verified local index contains the first **10,000 valid articles** from the
+dump. This is a subset, not the complete Telugu Wikipedia corpus. The actual
+build encountered 12,911 XML pages while finding those 10,000 valid articles:
+2,218 non-main-namespace pages and 693 redirects were skipped; no empty
+articles were encountered before the limit was reached.
+
+## Technologies
+
+- Python 3.10 or later
+- `mwparserfromhell` for structured MediaWiki markup parsing
+- Python standard library: `bz2`, `xml.etree.ElementTree`, SQLite, JSON,
+  temporary files, heap-based merging, Unicode normalization, and hashing
+- `pytest` for automated tests
+- `nltk` for the retained Reuters demo only
+
+Install dependencies from the repository root in PowerShell:
 
 ```powershell
 py -m venv .venv
@@ -17,138 +46,246 @@ py -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-Download and verify Reuters:
+`requirements.txt` pins the supported major-version ranges for NLTK, pytest,
+and mwparserfromhell. Building or opening the Wikipedia index does not require
+downloading the Reuters corpus. The Reuters demo requires its NLTK Reuters
+corpus to be available.
 
-```powershell
-python scripts\download_dataset.py
+## Project structure
+
+```text
+.
+├── main.py
+├── requirements.txt
+├── scripts/
+│   └── download_dataset.py       # Legacy Reuters corpus helper
+├── src/
+│   ├── dataset_loader.py         # Legacy Reuters loader
+│   ├── disk_index_builder.py     # External-sort disk index builder
+│   ├── evaluation.py             # Legacy in-memory evaluation helpers
+│   ├── index_builder.py          # In-memory positional-index helper
+│   ├── inverted_index.py         # Legacy in-memory term-to-document index
+│   ├── positional_index.py       # In-memory positional reference index
+│   ├── preprocessor.py           # Unicode NFC normalization and tokenization
+│   ├── search_engine.py          # Legacy in-memory Reuters query engine
+│   ├── storage_manager.py        # Disk postings access and index validation
+│   ├── wikipedia_dataset_loader.py
+│   └── wikitext_cleaner.py
+└── tests/
+    ├── test_disk_index.py
+    ├── test_main.py
+    ├── test_positional_index.py
+    ├── test_preprocessor.py
+    ├── test_wikipedia_dataset_loader.py
+    ├── test_wikitext_cleaner.py
+    └── ...                       # Remaining Reuters and shared tests
 ```
 
-The script uses NLTK's Reuters corpus and reports its document and category counts, plus a small sample check. NLTK typically stores downloaded data in its user-level `nltk_data` directory, outside this repository; the corpus is not copied into Git.
+The generated `storage/` directory is local, ignored output. Its current
+generation is selected by `storage/current.json`; each generation contains
+`vocabulary.json` and `postings.bin`.
 
-To run the setup again, use the same command. NLTK reuses an existing download.
+## Processing and storage architecture
 
-## Phase 2: Dataset Loading and Preprocessing
-
-The `DatasetLoader` exposes the Reuters document count and categories, and
-`iter_documents()` yields each original Reuters file ID with its raw article
-text. It retrieves each article only as it is iterated, rather than retaining
-the corpus text in memory.
-
-`Preprocessor.process(text)` lowercases text and produces tokens in source
-order. Letters, digits, and mixed alphanumeric tokens are retained; punctuation
-and underscores separate tokens. Numbers are kept rather than discarded. Stop
-word removal and NLTK Porter stemming are optional and off by default. Token
-positions in later indexes will refer to this returned list, using zero-based
-positions.
-
-Run the unit tests from the project directory:
-
-```powershell
-python -m pytest
+```mermaid
+flowchart TD
+    A[Compressed Wikipedia XML] -->|streaming bzip2 and XML parsing| B[WikipediaDatasetLoader]
+    B -->|page ID, title, raw Wikitext| C[WikipediaTextCleaner]
+    C --> D[Telugu Preprocessor]
+    D -->|ordered token sequence| E[Bounded term-document record buffer]
+    E -->|sort and flush| F[Temporary sorted runs]
+    F -->|bounded fan-in merge| G[Sequential postings writer]
+    G --> H[(postings.bin on disk)]
+    G --> I[Vocabulary metadata: CF, DF, byte offset, length, checksum]
+    I --> J[vocabulary.json on disk]
+    J --> K[StorageManager loads vocabulary into RAM]
+    K -->|seek and read requested byte range| H
 ```
 
-To check a few actual Reuters documents after completing Phase 1:
+### Loading and cleaning
+
+`WikipediaDatasetLoader` uses incremental XML parsing over the bzip2 stream.
+It filters non-main-namespace pages, redirects, and empty text and yields each
+eligible page with its stable Wikipedia page ID, title, and raw Wikitext.
+
+`WikipediaTextCleaner` parses Wikitext and handles common markup, including
+internal and external links, references, headings, formatting, categories,
+file/image markup, tables, HTML entities, and tags. It retains readable text
+where appropriate and normalizes whitespace and Unicode to NFC.
+
+`Preprocessor` applies NFC normalization and lowercasing, then emits tokens in
+source order. Unicode letters and numbers are retained; combining marks remain
+attached to a preceding token. Punctuation, underscores, and whitespace are
+separators. Telugu stop words are not removed by default, and no English
+stemming is applied.
+
+### Positional postings, CF, and DF
+
+For each token in the processed sequence, its zero-based list index is the
+token position. Repeated terms receive all of their positions in that
+document.
+
+- **CF (collection frequency):** total occurrences of a term across the
+  indexed documents.
+- **DF (document frequency):** number of distinct indexed documents containing
+  that term.
+- **Document ID:** the original Wikipedia page ID provided by the loader.
+- **Position:** zero-based index in the preprocessor's ordered token sequence.
+
+For example, the processed tokens `["తెలుగు", "భాష", "తెలుగు"]` produce
+`తెలుగు → document:[0, 2]` and `భాష → document:[1]`. The first 10,000-article
+index reports `తెలుగు` with CF 6,806 and DF 3,251.
+
+### External sorting and disk lookup
+
+The disk builder groups each article's token positions by term, then appends
+term/document/positions records to a buffer capped by a configurable record
+count (50,000 by default). Full buffers are sorted by term and document ID and
+written as temporary runs. Runs are merged externally with a fan-in of at most
+32 files per merge operation, using multiple merge levels as needed. Duplicate
+document IDs are checked in a temporary SQLite database rather than a
+corpus-sized Python set.
+
+During the final merge, postings are written sequentially to `postings.bin`.
+Each term's vocabulary entry stores CF, DF, byte offset, byte length, and a
+SHA-256 checksum for that serialized record. The vocabulary and postings are
+written to a new generation and validated before the single
+`current.json` manifest is atomically updated. Previous generations are not
+deleted by the builder.
+
+When `StorageManager` opens an index, it loads the vocabulary metadata into
+memory and validates the generation ID, record ranges, and file bounds. It
+does not load the complete postings file. A term lookup uses the in-memory
+metadata to seek to the record's byte offset and read only its byte length;
+the record is decoded as UTF-8 and checked against its checksum and CF/DF.
+An individual lookup returns all postings for that term, so a very frequent
+term can itself have a large result.
+
+The record-count buffer bounds the number of buffered records, not their total
+byte size. One large article and the in-memory vocabulary therefore still
+affect peak memory. Vocabulary memory is intentionally proportional to the
+number of unique terms, as required by the assignment.
+
+## Build, reopen, and search
+
+Place the compressed dump in the repository root, then build the verified
+10,000-valid-article subset:
 
 ```powershell
-python -c "from itertools import islice; from src.dataset_loader import DatasetLoader; from src.preprocessor import Preprocessor; loader = DatasetLoader(); processor = Preprocessor(); print('Documents:', loader.document_count); [print(doc['document_id'], processor.process(doc['text'])[:12]) for doc in islice(loader.iter_documents(), 3)]"
+python -X utf8 main.py `
+  --dump .\tewiki-latest-pages-articles.xml.bz2 `
+  --limit 10000 `
+  --storage .\storage `
+  --verify
 ```
 
-## Phase 3: Inverted Index
+`--limit` counts valid yielded articles, not all XML pages scanned. The
+application reports indexing progress every 500 articles, prints statistics,
+and enters an interactive Telugu term prompt when indexing completes.
+`--verify` checks every postings record after building. Verification reads the
+records one at a time; it does not load the complete postings file.
 
-`InvertedIndex.build(documents)` consumes the loader's document iterator and
-uses the same `Preprocessor` to normalize article text. It maps each token to
-the set of original Reuters file IDs containing it. Repeated occurrences in one
-article do not duplicate that document ID. `get_postings(term)` returns a copy
-of the matching ID set, while `get_document_frequency(term)` returns its size.
-Unknown terms (and inputs that do not preprocess to exactly one token) return
-empty postings and frequency zero.
-
-The index is in memory; the loader still yields article text incrementally.
-Run its unit tests with `python -m pytest -q`.
-
-To build an index over the actual Reuters corpus and inspect example postings:
+Open the currently published index later, without reading the XML dump:
 
 ```powershell
-python -c "from src.dataset_loader import DatasetLoader; from src.inverted_index import InvertedIndex; index = InvertedIndex(); index.build(DatasetLoader().iter_documents()); print('Documents:', index.document_count); print('Unique terms:', index.unique_term_count); print('oil document frequency:', index.get_document_frequency('oil')); print('oil sample postings:', sorted(index.get_postings('oil'))[:10])"
+python -X utf8 main.py --load-existing --storage .\storage
 ```
 
-## Phase 4: Positional Index
-
-`PositionalIndex.build(documents)` uses the same preprocessing pipeline and
-stores every term occurrence by document ID. Positions are zero-based indexes
-into the processed token sequence, so optional stop-word removal changes the
-sequence being indexed consistently. `get_postings(term)` returns a copy of
-the term's document-to-positions mapping; `get_positions(term, document_id)`
-and `get_term_frequency(term, document_id)` provide document-level lookups.
-
-Run the unit tests with `python -m pytest -q`. To inspect positions from a few
-actual Reuters documents:
+To re-run full record verification when opening:
 
 ```powershell
-python -c "from itertools import islice; from src.dataset_loader import DatasetLoader; from src.positional_index import PositionalIndex; index = PositionalIndex(); index.build(islice(DatasetLoader().iter_documents(), 3)); print('Documents:', index.document_count); print('oil postings:', index.get_postings('oil'))"
+python -X utf8 main.py --load-existing --storage .\storage --verify
 ```
 
-## Phase 5: Search
+At the prompt, enter one term, for example `తెలుగు`, to display its CF, DF,
+and postings; enter `q` to exit. The CLI prints all postings for a found term,
+which can produce extensive output for common terms.
 
-`SearchEngine` uses the inverted index for term lookup and Boolean AND/OR
-intersection/union, and the positional index for exact phrase search. A phrase
-must match consecutive processed-token positions; `phrase_positions()` returns
-the zero-based start positions for each matching document. It handles unknown
-terms and empty queries with empty results. Malformed non-empty syntax raises a
-`ValueError` with a query explanation.
-
-Supported queries are a single term (`oil`), two terms joined by one Boolean
-operator (`oil AND prices`, `oil OR prices`), or a quoted phrase (`"oil prices"`).
-Unquoted multiple terms, mixed/repeated operators, and malformed quotes are
-rejected rather than interpreted ambiguously. Pass the same `Preprocessor`
-instance to both indexes so query normalization matches indexing.
-
-Run the search tests with `python -m pytest -q`. For a small deterministic
-example:
+The index can also be inspected from Python while limiting displayed examples:
 
 ```powershell
-python -c "from src.inverted_index import InvertedIndex; from src.positional_index import PositionalIndex; from src.search_engine import SearchEngine; docs = [{'document_id': 'example-1', 'text': 'oil prices rose'}]; inverted = InvertedIndex(); positional = PositionalIndex(); inverted.build(docs); positional.build(docs); engine = SearchEngine(inverted, positional); print(engine.search('oil AND prices')); print(engine.phrase_positions('oil prices'))"
+@'
+import sys
+sys.stdout.reconfigure(encoding="utf-8")
+from src.storage_manager import StorageManager
+
+index = StorageManager("storage")
+term = "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41"
+statistics = index.get_term_statistics(term)
+print("Statistics:", statistics)
+if statistics is not None:
+    postings = index.get_postings(term)
+    print("Sample postings:", dict(list(postings.items())[:5]))
+'@ | python -X utf8 -
 ```
 
-## Phase 6: Evaluation
+The main CLI's `--limit` defaults to 5,000 when omitted. Set it explicitly to
+10,000 to reproduce the documented subset size.
 
-`src/evaluation.py` measures Reuters document count, unique terms, total token
-occurrences, combined index construction time, approximate Python object
-storage, and execution time/result count for representative term, Boolean, and
-phrase queries. The evaluator feeds each lazily loaded article to both indexes
-in one pass. Its storage measurement walks the in-memory Python objects and is
-an approximation; it is not serialized size or peak process memory.
+## Verified 10,000-article results
 
-The evaluator includes consistency checks for term retrieval, Boolean
-intersection/union, exact and repeated-term phrases, unknown terms, and empty
-queries. These checks are not relevance judgments. Reuters category metadata is
-available, but this project does not treat categories as query-level relevance
-labels; precision and recall are therefore not reported.
+The following values are from the actual completed local build and full
+postings verification; they are measurements, not estimates.
 
-Run the evaluation against the complete Reuters corpus:
-
-```powershell
-python -c "from src.evaluation import evaluate_corpus; report = evaluate_corpus(); print(report)"
-```
-
-Full-corpus measurements from a local run (Windows, Python 3.13.14):
-
-| Metric | Measurement |
+| Metric | Verified result |
 |---|---:|
-| Documents processed | 10,788 |
-| Unique terms | 30,953 |
-| Term occurrences | 1,476,858 |
-| Combined index construction time | 21.939 seconds |
-| Approximate in-memory index storage | 168,613,671 bytes (160.80 MiB) |
+| Valid documents indexed | 10,000 |
+| XML pages encountered to reach the limit | 12,911 |
+| Non-main-namespace pages skipped | 2,218 |
+| Redirects skipped | 693 |
+| Empty articles encountered | 0 |
+| Token occurrences | 4,916,974 |
+| Total CF summed over vocabulary | 4,916,974 |
+| Unique vocabulary terms | 303,366 |
+| `postings.bin` | 127,229,948 bytes |
+| `vocabulary.json` | 45,875,367 bytes |
+| Combined index files | 173,105,315 bytes |
+| Build time | 367.4 seconds |
+| Full verification time | 106.48 seconds |
+| Total elapsed build and verification | 473.88 seconds |
+| Estimated retained vocabulary object memory | 127,273,556 bytes |
+| Peak process RSS during build/verification | 539,963,392 bytes |
+| Peak temporary build data | 312,597,685 bytes |
 
-| Query | Execution time | Results |
-|---|---:|---:|
-| `oil` | 0.000073 seconds | 1,038 |
-| `oil AND prices` | 0.000292 seconds | 389 |
-| `oil OR prices` | 0.000130 seconds | 1,656 |
-| `"oil prices"` | 0.002926 seconds | 212 |
+Memory and timing depend on machine load and environment. The vocabulary
+memory value is an estimate of retained Python vocabulary objects; RSS is the
+measured process working-set peak. The indexed data is the first 10,000 valid
+articles, not the full corpus.
 
-These are measurements from one run, not performance guarantees. Query times
-vary with machine load and environment. Approximate storage includes the Python
-objects reachable from the two indexes and should not be interpreted as peak
-process memory.
+### Actual sample term searches
+
+These are sample excerpts from the actual postings. Positions are zero-based;
+posting lists shown here are abbreviated, while the CLI prints the full list.
+
+| Term | Exists | CF | DF | Sample document IDs and positions |
+|---|---:|---:|---:|---|
+| తెలుగు | Yes | 6,806 | 3,251 | `1:[7]`, `10050:[68]`, `10085:[189,207,215,279]` |
+| భారతదేశం | Yes | 447 | 222 | `10267:[281]`, `10277:[34]`, `10278:[17,351]` |
+| ఆంధ్రప్రదేశ్ | Yes | 1,714 | 1,008 | `10028:[135]`, `10039:[219]`, `10046:[39]` |
+| కంప్యూటర్ | Yes | 131 | 64 | `10306:[71]`, `1150:[291,339]`, `1212:[68,127,151,169,197,246,304,367]` |
+
+## Tests
+
+Run the complete test suite from the repository root:
+
+```powershell
+python -m pytest -q
+```
+
+The verified result for this project state is **95 passed**. Tests cover
+preprocessing, Wikitext cleaning, XML loading, in-memory indexing, disk
+serialization and retrieval, checksums, generation publication, and CLI
+behavior.
+
+## Limitations
+
+- The delivered disk index covers 10,000 valid articles only; it is not an
+  index of the entire Telugu Wikipedia corpus.
+- The interactive index CLI supports single-term CF/DF and postings
+  inspection. The legacy Reuters CLI's Boolean and phrase-search capabilities
+  use separate in-memory Reuters indexes; they do not operate on the Telugu
+  disk index.
+- The configured sort-buffer limit is in records rather than bytes, and
+  vocabulary metadata is held in memory by design.
+  - Generated index files and the compressed dataset are local artifacts and
+    are not committed to Git.
